@@ -1,0 +1,214 @@
+:root {
+  --primary-color: #0346B8;
+
+  --border-radius: 18px;
+  --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --transition: all 0.3s ease;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  line-height: 1.6;
+  color: #333;
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+
+.preview-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: calc(var(--border-radius) - 4px);
+}
+
+/* Button Styles */
+.btn {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: var(--border-radius);
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  text-align: center;
+}
+
+
+
+.download-btn:hover {
+  background: var(--success-hover);
+  transform: translateY(-2px);
+}
+
+/* Employee List Styles */
+.employee-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin: 1.5rem 0;
+}
+
+.employee-card {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: var(--border-radius);
+  padding: 1.25rem;
+  box-shadow: var(--card-shadow);
+  transition: var(--transition);
+}
+
+.employee-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Date Display Styles */
+.month-day-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 1.5rem 0;
+  color: var(--primary-color);
+}
+
+/* Anniversary Selector Styles */
+.anniversary-selector {
+  margin: 1.5rem 0;
+  padding: 1.25rem;
+  background: #f0f0f0;
+  border-radius: var(--border-radius);
+  position: relative;
+  z-index: 10;
+}
+
+.anniversary-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.anniversary-option {
+  width: 100%;
+  aspect-ratio: 1;
+  cursor: pointer;
+  border: 2px solid transparent;
+  object-fit: cover;
+  border-radius: calc(var(--border-radius) - 4px);
+  transition: var(--transition);
+}
+
+.anniversary-option:hover {
+  transform: scale(1.05);
+}
+
+.anniversary-option.selected {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(3, 70, 184, 0.2);
+}
+
+/* Section Container Styles */
+.section-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.5rem;
+  margin: 1.5rem 0;
+}
+
+.section-div {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: var(--border-radius);
+  padding: 1.25rem;
+  min-height: 100px;
+  opacity: 1;
+  transition: var(--transition);
+  box-shadow: var(--card-shadow);
+  display: flex;
+  flex-direction: column;
+}
+
+.section-div.empty {
+  opacity: 0.5;
+  background-color: #f9f9f9;
+}
+
+/* Control Panel Styles */
+
+
+.position-controls, .text-position-controls {
+  margin: 1rem 0;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  body {
+    padding: 1rem;
+  }
+  
+  .employee-list, .section-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .anniversary-options {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Animation Enhancements */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.section-div, .employee-card, .anniversary-option {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.text-position-controls, .position-controls {
+    margin: 1.5rem 0;
+    padding: 1.25rem;
+    background: #f0f0f0;
+    border-radius: var(--border-radius);
+    position: relative;
+    z-index: 10;
+}
+
+
+/* Order the elements inside resultContainer */
+.section-container {
+  order: 1;
+}
+
+.month-day-display {
+  order: 2;
+  display: none;
+}
+
+.anniversary-selector {
+  order: 3;
+
+}
+
+.position-controls {
+  order: 5;
+    display: none;
+}
+
+.preview-container {
+  order: 6;
+}
+
+.text-position-controls {
+  order: 4;
+    display: none;
+}
+
+#resultContainer {
+  display: flex;
+  flex-direction: column;
+}

@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Birthday Post Generator</title>
+    <link rel="stylesheet" href="./common/css/root.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+
+</head>
+
+
+<body>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif !important;
+            padding: 2rem;
+            margin: 0 auto;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Inter", sans-serif !important;
+        }
+    </style>
+
+    <div class="control-panel">
+        <div class="control-group">
+            <label for="excelFile">Excel File</label>
+            <input type="file" id="excelFile" accept=".xlsx, .xls">
+        </div>
+        <div class="control-group">
+            <label for="datePicker">Birthday Date</label>
+            <input type="text" id="datePicker" placeholder="DD/MM">
+        </div>
+        <button id="processBtn">Generate Birthday Post</button>
+    </div>
+
+    <div id="resultContainer"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+        flatpickr("#datePicker", {
+            dateFormat: "d/m",
+            enableTime: false,
+            noCalendar: false
+        });
+
+        let selectedAnniversaryImage = null;
+        let canvasBgImage = null;
+        let birthdayEmployees = [];
+        let currentX = -600;
+        let currentY = 531;
+        let monthX = 530;
+        let monthY = -165;
+        let monthRotation = 1.1; 
+        let dayX = 465;
+        let dayY = 71;
+        let dayRotation = 1.4; 
+        let imageZIndex = 999;
+
+        document.getElementById('processBtn').addEventListener('click', processExcel);
+
+        function fixTurkishCharacters(text) {
+            if (!text) return text;
+            const replacements = {
+                'İ': 'İ',  
+                'ı': 'ı',  
+                'i': 'i', 
+                'ğ': 'ğ',
+                'Ğ': 'Ğ',
+                'ş': 'ş',
+                'Ş': 'Ş',
+                'ü': 'ü',
+                'Ü': 'Ü',
+                'ö': 'ö',
+                'Ö': 'Ö',
+                'ç': 'ç',
+                'Ç': 'Ç'
+            };
+
+            return text.replace(/[İıiğĞşŞüÜöÖçÇ]/g, char => replacements[char] || char);
+        }
+        // function transformDepartment(jobOriginal) {
+        //     const jobReplaceList = [
+        //         "BBGİ ofisi",
+        //         "Bəyannamə bölməsi",
+        //         "Gömrük təmsilçiliyi bölməsi",
+        //         "HNBGİ ofisi",
+        //         "Koordinasiya şöbəsi",
+        //         "Koordinasiya şöbəsi / Sertifikatlaşdırma bölməsi",
+        //         "Mühasibatlıq şöbəsi",
+        //         "MB Broker",
+        //         "Mühasibatlıq şöbəsi / Kassa - hesablaşmalar bölməsi",
+        //         "Satış şöbəsi",
+        //     ];
+
+        //     if (jobOriginal === "TIR Park və minik avtomobillərinin dayanacağı şöbəsi") {
+        //         return [
+        //             "TIR Park və m. a. dayanacağı şöbəsi"
+        //         ];
+        //     } else if (jobOriginal.startsWith("DDD / Daxili daşımalar departamenti")) {
+        //         return ["Daxili daşımalar departamenti"];
+        //     } else if (jobReplaceList.some(prefix => jobOriginal.startsWith(prefix))) {
+        //         return ["MB BROKER"];
+        //     } else {
+        //         return [jobOriginal];
+        //     }
+        // }
+
+
+        function transformDepartment(jobOriginal) {
+            const jobReplaceList = [
+                "BBGİ ofisi",
+                "Bəyannamə bölməsi",
+                "Gömrük təmsilçiliyi bölməsi",
+                "HNBGİ ofisi",
+                "Koordinasiya şöbəsi",
+                "Koordinasiya şöbəsi / Sertifikatlaşdırma bölməsi",
+                "Mühasibatlıq şöbəsi",
+                "MB Broker",
+                "Mühasibatlıq şöbəsi / Kassa - hesablaşmalar bölməsi",
+                "Satış şöbəsi",
+            ];
+
+            if (jobOriginal === "TIR Park və minik avtomobillərinin dayanacağı şöbəsi") {
+                return [
+                    "TIR Park və m. a. dayanacağı şöbəsi"
+                ];
+            } else if (jobOriginal.startsWith("DDD / Daxili daşımalar departamenti")) {
+                return ["Daxili daşımalar departamenti"];
+            } else if (jobOriginal.startsWith("İRİD/İstedadların cəlbi və idarə olunması şöbəsi")) {
+                return ["İRİD / İstedadların cəlbi və idarə olunması Ş."];
+            } else if (jobReplaceList.some(prefix => jobOriginal.startsWith(prefix))) {
+                return ["MB BROKER"];
+            } else {
+                return [jobOriginal];
+            }
+        }
+
+        function createPositionControls() {
+            const controlsDiv = document.createElement('div');
+            controlsDiv.className = 'position-controls';
+            controlsDiv.innerHTML = `
+                <h3>Adjust Employee Sections Position</h3>
+                <div style="display: flex; gap: 15px; margin-top: 10px;">
+                    <div class="control-group">
+                        <label>Horizontal (X)</label>
+                        <input type="range" id="xPosition" min="-600" max="200" value="${currentX}" style="width: 200px;">
+                        <span id="xValue">${currentX}px</span>
+                    </div>
+                    <div class="control-group">
+                        <label>Vertical (Y)</label>
+                        <input type="range" id="yPosition" min="100" max="600" value="${currentY}" style="width: 200px;">
+                        <span id="yValue">${currentY}px</span>
+                    </div>
+                    <button id="resetPosition">Reset</button>
+                </div>
+            `;
+
+            const existingControls = document.querySelector('.position-controls');
+            if (existingControls) {
+                existingControls.replaceWith(controlsDiv);
+            } else {
+                document.getElementById('resultContainer').appendChild(controlsDiv);
+            }
+
+            const xSlider = document.getElementById('xPosition');
+            const ySlider = document.getElementById('yPosition');
+            const xValue = document.getElementById('xValue');
+            const yValue = document.getElementById('yValue');
+            const resetBtn = document.getElementById('resetPosition');
+
+            xSlider.addEventListener('input', function () {
+                currentX = parseInt(this.value);
+                xValue.textContent = `${currentX}px`;
+                generateFinalImage();
+            });
+
+            ySlider.addEventListener('input', function () {
+                currentY = parseInt(this.value);
+                yValue.textContent = `${currentY}px`;
+                generateFinalImage();
+            });
+
+            resetBtn.addEventListener('click', function () {
+                currentX = -600;
+                currentY = 531;
+                xSlider.value = currentX;
+                ySlider.value = currentY;
+                xValue.textContent = `${currentX}px`;
+                yValue.textContent = `${currentY}px`;
+                generateFinalImage();
+            });
+        }
+
+        function createTextPositionControls() {
+            const controlsDiv = document.createElement('div');
+            controlsDiv.className = 'text-position-controls';
+            controlsDiv.innerHTML = `
+                <h3>Adjust Text Position</h3>
+                <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px;">
+                    <div class="control-group">
+                        <label>Month X Position</label>
+                        <input type="range" id="monthX" min="-800" max="800" value="${monthX}" style="width: 200px;">
+                        <span id="monthXValue">${monthX}px</span>
+                    </div>
+                    <div class="control-group">
+                        <label>Month Y Position</label>
+                        <input type="range" id="monthY" min="-800" max="800" value="${monthY}" style="width: 200px;">
+                        <span id="monthYValue">${monthY}px</span>
+                    </div>
+                    <div class="control-group">
+                        <label>Month Rotation</label>
+                        <input type="range" id="monthRotation" min="-10" max="10" step="0.1" value="${monthRotation}" style="width: 200px;">
+                        <span id="monthRotationValue">${monthRotation}°</span>
+                    </div>
+                    <div class="control-group">
+                        <label>Day X Position</label>
+                        <input type="range" id="dayX" min="-800" max="800" value="${dayX}" style="width: 200px;">
+                        <span id="dayXValue">${dayX}px</span>
+                    </div>
+                    <div class="control-group">
+                        <label>Day Y Position</label>
+                        <input type="range" id="dayY" min="-1300" max="1300" value="${dayY}" style="width: 200px;">
+                        <span id="dayYValue">${dayY}px</span>
+                    </div>
+                    <div class="control-group">
+                        <label>Day Rotation</label>
+                        <input type="range" id="dayRotation" min="-10" max="10" step="0.1" value="${dayRotation}" style="width: 200px;">
+                        <span id="dayRotationValue">${dayRotation}°</span>
+                    </div>
+                    <button id="resetTextPosition">Reset Text</button>
+                </div>
+            `;
+
+            const existingControls = document.querySelector('.text-position-controls');
+            if (existingControls) {
+                existingControls.replaceWith(controlsDiv);
+            } else {
+                document.getElementById('resultContainer').appendChild(controlsDiv);
+            }
+
+            const monthXSlider = document.getElementById('monthX');
+            const monthYSlider = document.getElementById('monthY');
+            const monthRotationSlider = document.getElementById('monthRotation');
+            const dayXSlider = document.getElementById('dayX');
+            const dayYSlider = document.getElementById('dayY');
+            const dayRotationSlider = document.getElementById('dayRotation');
+            const monthXValue = document.getElementById('monthXValue');
+            const monthYValue = document.getElementById('monthYValue');
+            const monthRotationValue = document.getElementById('monthRotationValue');
+            const dayXValue = document.getElementById('dayXValue');
+            const dayYValue = document.getElementById('dayYValue');
+            const dayRotationValue = document.getElementById('dayRotationValue');
+            const resetBtn = document.getElementById('resetTextPosition');
+
+            monthXSlider.addEventListener('input', function () {
+                monthX = parseInt(this.value);
+                monthXValue.textContent = `${monthX}px`;
+                generateFinalImage();
+            });
+
+            monthYSlider.addEventListener('input', function () {
+                monthY = parseInt(this.value);
+                monthYValue.textContent = `${monthY}px`;
+                generateFinalImage();
+            });
+
+            monthRotationSlider.addEventListener('input', function () {
+                monthRotation = parseFloat(this.value);
+                monthRotationValue.textContent = `${monthRotation}°`;
+                generateFinalImage();
+            });
+
+            dayXSlider.addEventListener('input', function () {
+                dayX = parseInt(this.value);
+                dayXValue.textContent = `${dayX}px`;
+                generateFinalImage();
+            });
+
+            dayYSlider.addEventListener('input', function () {
+                dayY = parseInt(this.value);
+                dayYValue.textContent = `${dayY}px`;
+                generateFinalImage();
+            });
+
+            dayRotationSlider.addEventListener('input', function () {
+                dayRotation = parseFloat(this.value);
+                dayRotationValue.textContent = `${dayRotation}°`;
+                generateFinalImage();
+            });
+
+            resetBtn.addEventListener('click', function () {
+                monthX = 530;
+                monthY = -165;
+                monthRotation = 1.1;
+                dayX = 465;
+                dayY = 71;
+
+                // Reset day rotation based on month
+                const monthName = document.querySelector('.Section-month')?.textContent;
+                const highRotationMonths = ["YANVAR", "FEVRAL", "AVQUST", "SENTYABR", "OKTYABR", "NOYABR", "DEKABR"];
+                const lowRotationMonths = ["MART", "APREL", "MAY", "İYUN", "İYUL"];
+
+                if (highRotationMonths.includes(monthName)) {
+                    dayRotation = 1.4;
+                } else if (lowRotationMonths.includes(monthName)) {
+                    dayRotation = 1.8;
+                } else {
+                    dayRotation = 1.4; // Default
+                }
+
+                monthXSlider.value = monthX;
+                monthYSlider.value = monthY;
+                monthRotationSlider.value = monthRotation;
+                dayXSlider.value = dayX;
+                dayYSlider.value = dayY;
+                dayRotationSlider.value = dayRotation;
+                monthXValue.textContent = `${monthX}px`;
+                monthYValue.textContent = `${monthY}px`;
+                monthRotationValue.textContent = `${monthRotation}°`;
+                dayXValue.textContent = `${dayX}px`;
+                dayYValue.textContent = `${dayY}px`;
+                dayRotationValue.textContent = `${dayRotation}°`;
+                generateFinalImage();
+            });
+        }
+
+        function createAnniversarySelector() {
+            const selectorDiv = document.createElement('div');
+            selectorDiv.className = 'anniversary-selector';
+            selectorDiv.innerHTML = `
+                <h3>Select Anniversary Image (1-10.png)</h3>
+                <div class="anniversary-options" id="anniversaryOptions"></div>
+            `;
+
+            const existingSelector = document.querySelector('.anniversary-selector');
+            if (existingSelector) {
+                existingSelector.replaceWith(selectorDiv);
+            } else {
+                document.getElementById('resultContainer').appendChild(selectorDiv);
+            }
+
+            const optionsContainer = document.getElementById('anniversaryOptions');
+
+            // Load first 10 images
+            for (let i = 1; i <= 10; i++) {
+                const option = document.createElement('img');
+                option.className = 'anniversary-option';
+                option.src = `./assets/img/${i}.png`;
+                option.dataset.number = i;
+                option.onclick = function () {
+                    document.querySelectorAll('.anniversary-option').forEach(el => {
+                        el.classList.remove('selected');
+                    });
+                    this.classList.add('selected');
+                    selectedAnniversaryImage = this.src;
+                    generateFinalImage();
+                };
+                option.onerror = function () {
+                    this.remove();
+                };
+
+                optionsContainer.appendChild(option);
+            }
+
+            // Select the first image by default
+            if (optionsContainer.firstChild) {
+                optionsContainer.firstChild.click();
+            }
+        }
+
+        async function processExcel() {
+            const file = document.getElementById('excelFile').files[0];
+            const selectedDate = document.getElementById('datePicker').value;
+
+            if (!file || !selectedDate) {
+                alert("Please upload file and select date");
+                return;
+            }
+
+            const [day, month] = selectedDate.split('/');
+            const reader = new FileReader();
+
+            reader.onload = async function (e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+                const resultContainer = document.getElementById('resultContainer');
+
+                // Clear only the preview and employee data, keep controls
+                const elementsToRemove = document.querySelectorAll('.preview-container, .month-day-display, .employee-list, .section-container');
+                elementsToRemove.forEach(el => el.remove());
+
+                // Get selected date parts
+                const selectedDate = document.getElementById('datePicker').value;
+                const [selectedDay, selectedMonth] = selectedDate.split('/').map(Number);
+
+                birthdayEmployees = jsonData.filter(row => {
+                    if (!row.ДатаР2) return false;
+
+                    // Convert to string in case it's a date object or number
+                    const dateStr = row.ДатаР2.toString().trim();
+
+                    // Handle different date formats
+                    let day, month;
+
+                    // Format: DD.MM.YYYY (14.06.1980)
+                    if (dateStr.match(/^\d{1,2}\.\d{1,2}\.\d{4}$/)) {
+                        const parts = dateStr.split('.');
+                        day = parseInt(parts[0], 10);
+                        month = parseInt(parts[1], 10);
+                    }
+                    // Format: YYYY-MM-DD (if dates come as ISO strings)
+                    else if (dateStr.match(/^\d{4}-\d{1,2}-\d{1,2}$/)) {
+                        const parts = dateStr.split('-');
+                        day = parseInt(parts[2], 10);
+                        month = parseInt(parts[1], 10);
+                    }
+                    // If it's an Excel serial date number (unlikely but possible)
+                    else if (!isNaN(dateStr)) {
+                        const date = new Date((parseFloat(dateStr) - 25569) * 86400 * 1000);
+                        day = date.getDate();
+                        month = date.getMonth() + 1;
+                    } else {
+                        console.warn("Unrecognized date format:", dateStr);
+                        return false;
+                    }
+
+                    return day === selectedDay && month === selectedMonth;
+                });
+
+                // Create and populate section divs
+                const sectionContainer = document.createElement('div');
+                sectionContainer.className = 'section-container';
+
+                for (let i = 0; i < 5; i++) {
+                    const sectionDiv = document.createElement('div');
+                    sectionDiv.className = 'section-div' + (i >= birthdayEmployees.length ? ' empty' : '');
+                    sectionDiv.id = `section-${i + 1}`;
+
+                    if (i < birthdayEmployees.length) {
+                        const employee = birthdayEmployees[i];
+                        const name = fixTurkishCharacters(employee.ссылка);
+                        const jobOriginal = fixTurkishCharacters(employee.Department || '').trim();
+                        const jobLines = transformDepartment(jobOriginal);
+
+                        sectionDiv.innerHTML = `
+                            <h3>${name || 'Name not available'}</h3>
+                            <div>${jobLines.join('<br>')}</div>
+                        `;
+                    } else {
+                        sectionDiv.innerHTML = `<h3>Section ${i + 1}</h3>`;
+                    }
+
+                    sectionContainer.appendChild(sectionDiv);
+                }
+
+                resultContainer.appendChild(sectionContainer);
+
+                if (birthdayEmployees.length === 0) {
+                    resultContainer.innerHTML += '<p>No employees found with birthdays on this date</p>';
+                    return;
+                }
+
+                // Display month and day
+                const monthNames = ["YANVAR", "FEVRAL", "MART", "APREL", "MAY", "İYUN",
+                    "İYUL", "AVQUST", "SENTYABR", "OKTYABR", "NOYABR", "DEKABR"];
+                const monthName = monthNames[selectedMonth - 1];
+
+                const monthDayDisplay = document.createElement('div');
+                monthDayDisplay.className = 'month-day-display';
+                monthDayDisplay.innerHTML = `
+                    <div class="Section-month">${monthName}</div>
+                    <div class="Section-day">${selectedDay}</div>
+                `;
+                resultContainer.appendChild(monthDayDisplay);
+
+                // Set day rotation based on month
+                const highRotationMonths = ["YANVAR", "FEVRAL", "AVQUST", "SENTYABR", "OKTYABR", "NOYABR", "DEKABR"];
+                const lowRotationMonths = ["MART", "APREL", "MAY", "İYUN", "İYUL"];
+
+                if (highRotationMonths.includes(monthName)) {
+                    dayRotation = 1.4;
+                } else if (lowRotationMonths.includes(monthName)) {
+                    dayRotation = 1.8;
+                }
+
+                // Create anniversary selector and position controls
+                createAnniversarySelector();
+                createPositionControls();
+                createTextPositionControls();
+
+                try {
+                    canvasBgImage = await loadImage('./assets/img/canva.png');
+                    generateFinalImage();
+                } catch (error) {
+                    console.error("Error loading canvas background:", error);
+                    alert("Failed to load canvas background image");
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        async function generateFinalImage() {
+            if (!canvasBgImage || !selectedAnniversaryImage) return;
+
+            const monthName = document.querySelector('.Section-month')?.textContent;
+            const day = document.querySelector('.Section-day')?.textContent;
+
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = canvasBgImage.width;
+                canvas.height = canvasBgImage.height;
+                const ctx = canvas.getContext('2d');
+
+                // Draw background
+                ctx.drawImage(canvasBgImage, 0, 0);
+
+                // Draw month name with rotation
+                ctx.save();
+                ctx.translate(canvas.width / 2 + monthX, canvas.height / 2 + monthY);
+                ctx.rotate(monthRotation * Math.PI / 180);
+
+                ctx.fillStyle = '#016EE2';
+                ctx.font = 'italic 900 111px Inter';
+                ctx.textAlign = 'center';
+                ctx.shadowColor = '#0346B8';
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetX = 5;
+                ctx.shadowOffsetY = 5;
+                ctx.fillText(monthName, 0, 0);
+
+                // Add black drop shadow
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+                ctx.shadowBlur = 10;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+                ctx.fillText(monthName, 0, 0);
+
+                ctx.restore();
+
+                // Draw day with rotation
+                ctx.save();
+                ctx.translate(canvas.width / 2 + dayX, canvas.height / 2 + dayY);
+                ctx.rotate(dayRotation * Math.PI / 180);
+
+                ctx.fillStyle = '#016EE2';
+                ctx.font = 'italic 900 455.5px Inter';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowColor = '#0346B8';
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetX = 7;
+                ctx.shadowOffsetY = 7;
+                ctx.fillText(day, 0, 0);
+
+                // Add black drop shadow for day
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+                ctx.shadowBlur = 10;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+                ctx.fillText(day, 0, 0);
+
+                ctx.restore();
+
+                // Reset shadow for employee sections
+                ctx.shadowColor = 'transparent';
+
+                // Draw employee sections
+                const startX = (canvas.width - 1054) / 2 + currentX;
+                const startY = currentY;
+                const divWidth = 1054;
+                const divHeight = 207;
+                const gap = 17;
+
+                for (let i = 0; i < 5; i++) {
+                    const employee = birthdayEmployees[i];
+                    const y = startY + (i * (divHeight + gap));
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
+                    ctx.shadowBlur = 10;
+                    ctx.shadowOffsetX = 0;
+                    ctx.shadowOffsetY = 5;
+                    ctx.globalAlpha = employee ? 1 : 0.5;
+
+                    // Draw rounded rectangle
+                    ctx.beginPath();
+                    ctx.moveTo(startX + 18, y);
+                    ctx.lineTo(startX + divWidth - 18, y);
+                    ctx.quadraticCurveTo(startX + divWidth, y, startX + divWidth, y + 18);
+                    ctx.lineTo(startX + divWidth, y + divHeight - 18);
+                    ctx.quadraticCurveTo(startX + divWidth, y + divHeight, startX + divWidth - 18, y + divHeight);
+                    ctx.lineTo(startX + 18, y + divHeight);
+                    ctx.quadraticCurveTo(startX, y + divHeight, startX, y + divHeight - 18);
+                    ctx.lineTo(startX, y + 18);
+                    ctx.quadraticCurveTo(startX, y, startX + 18, y);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.shadowColor = 'transparent';
+                    ctx.globalAlpha = 1;
+
+                    if (employee) {
+                        const name = fixTurkishCharacters(employee.ссылка) || 'Name not available';
+                        const jobOriginal = fixTurkishCharacters(employee.Department || '').trim();
+                        const jobLines = transformDepartment(jobOriginal);
+
+                        // Draw employee name with 4px top margin
+                        ctx.fillStyle = '#000000';
+                        ctx.font = 'bold 50px Inter';
+                        ctx.textAlign = 'left';
+                        ctx.fillText(name, startX + 30, y + 70 + 14); // Added 4px top margin
+
+                        // Draw department with 7px top margin
+                        ctx.fillStyle = '#000000';
+                        ctx.font = '500 47px Inter';
+
+                        // Handle multi-line departments
+                        jobLines.forEach((line, j) => {
+                            // First line has 7px top margin, subsequent lines follow normal spacing
+                            const lineMargin = j === 0 ? 44 : 0;
+                            ctx.fillText(line, startX + 30, y + 120 + (j * 45) + lineMargin);
+                        });
+                    }
+                }
+
+                // Draw anniversary image LAST so it appears on top of everything
+                const anniversaryImg = await loadImage(selectedAnniversaryImage);
+                ctx.drawImage(anniversaryImg, 0, 0, canvas.width, canvas.height);
+
+                const previewContainer = document.createElement('div');
+                previewContainer.className = 'preview-container';
+
+                const previewImg = document.createElement('img');
+                previewImg.className = 'preview-image';
+                previewImg.src = canvas.toDataURL('image/png');
+
+                const downloadBtn = document.createElement('button');
+                downloadBtn.className = 'download-btn';
+                downloadBtn.textContent = 'Download Birthday Post';
+                downloadBtn.onclick = () => {
+                    const link = document.createElement('a');
+                    link.download = `Birthday_${monthName}_${day}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                };
+
+                document.querySelector('.preview-container')?.remove();
+                previewContainer.appendChild(previewImg);
+                previewContainer.appendChild(downloadBtn);
+
+                const positionControls = document.querySelector('.position-controls');
+                if (positionControls) {
+                    positionControls.after(previewContainer);
+                } else {
+                    document.getElementById('resultContainer').appendChild(previewContainer);
+                }
+
+            } catch (error) {
+                console.error("Error generating final image:", error);
+                alert("Error generating final image. Please check console for details.");
+            }
+        }
+        function loadImage(src) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = "Anonymous"; 
+                img.onload = () => resolve(img);
+                img.onerror = (e) => {
+                    console.error("Error loading image:", src, e);
+                    reject(new Error(`Failed to load image: ${src}`));
+                };
+                img.src = src;
+            });
+        }
+    </script>
+</body>
+
+</html>
